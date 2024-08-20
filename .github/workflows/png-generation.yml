@@ -8,7 +8,6 @@ on:
 permissions:
   contents: write
   actions: write
-  repository-projects: write
 
 env:
   LAST_COMMIT: ${{ vars.LAST_PROCESSED_COMMIT }}
@@ -94,6 +93,6 @@ jobs:
     - name: Update repository variable
       if: steps.check_update.outputs.update_needed == 'true'
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT }}
       run: |
         gh variable set LAST_PROCESSED_COMMIT -b "${{ steps.get_latest_commit.outputs.latest_commit }}"
