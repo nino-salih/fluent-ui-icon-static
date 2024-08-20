@@ -95,4 +95,8 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.PAT }}
       run: |
-        gh variable set LAST_PROCESSED_COMMIT -b "${{ steps.get_latest_commit.outputs.latest_commit }}"
+        curl -X PATCH \
+          -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/actions/variables/LAST_PROCESSED_COMMIT \
+          -d "{\"name\":\"LAST_PROCESSED_COMMIT\",\"value\":\"${{ steps.get_latest_commit.outputs.latest_commit }}\"}"
