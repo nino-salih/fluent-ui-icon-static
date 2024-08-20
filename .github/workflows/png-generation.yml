@@ -5,6 +5,13 @@ on:
     - cron: '0 0 * * *'  # Run daily at midnight
   workflow_dispatch:  # Allow manual trigger
 
+permissions:
+  contents: write
+  actions: write
+
+env:
+  LAST_COMMIT: ${{ vars.LAST_PROCESSED_COMMIT }}
+
 jobs:
   check-and-generate-pngs:
     runs-on: ubuntu-latest
@@ -17,15 +24,15 @@ jobs:
       id: get_latest_commit
       run: |
         LATEST_COMMIT=$(curl -s "https://api.github.com/repos/microsoft/fluentui-system-icons/commits/main" | jq -r .sha)
-        echo "::set-output name=latest_commit::$LATEST_COMMIT"
+        echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
 
     - name: Check if update is needed
       id: check_update
       run: |
-        if [ ! -f "last_processed_commit.txt" ] || [ "${{ steps.get_latest_commit.outputs.latest_commit }}" != "$(cat last_processed_commit.txt)" ]; then
-          echo "::set-output name=update_needed::true"
+        if [ -z "${{ env.LAST_COMMIT }}" ] || [ "${{ steps.get_latest_commit.outputs.latest_commit }}" != "${{ env.LAST_COMMIT }}" ]; then
+          echo "update_needed=true" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=update_needed::false"
+          echo "update_needed=false" >> $GITHUB_OUTPUT
         fi
 
     - name: Checkout microsoft/fluentui-system-icons
@@ -71,13 +78,21 @@ jobs:
 
     - name: Update last processed commit
       if: steps.check_update.outputs.update_needed == 'true'
-      run: echo "${{ steps.get_latest_commit.outputs.latest_commit }}" > last_processed_commit.txt
+      run: |
+        echo "LAST_PROCESSED_COMMIT=${{ steps.get_latest_commit.outputs.latest_commit }}" >> $GITHUB_ENV
 
     - name: Commit and push changes
       if: steps.check_update.outputs.update_needed == 'true'
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
-        git add assets last_processed_commit.txt
+        git add assets
         git commit -m "Update PNG icons" || echo "No changes to commit"
         git push
+
+    - name: Update repository variable
+      if: steps.check_update.outputs.update_needed == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh variable set LAST_PROCESSED_COMMIT -b "${{ steps.get_latest_commit.outputs.latest_commit }}"
