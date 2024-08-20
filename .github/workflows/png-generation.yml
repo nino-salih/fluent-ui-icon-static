@@ -60,17 +60,17 @@ jobs:
       run: |
         mkdir -p assets
         cd fluentui-temp/assets
-        for icon_folder in */; do
-          if [ -d "${icon_folder}SVG" ]; then
-            mkdir -p "../../assets/${icon_folder}png"
-            for svg_file in "${icon_folder}SVG"/*.svg; do
-              filename=$(basename "$svg_file" .svg)
-              for size in 16 32 64 128; do
-                rsvg-convert -w $size -h $size "$svg_file" | \
-                convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_folder}png/${filename}-${size}.png"
-              done
+        find . -type d -name "SVG" | while read -r svg_dir; do
+          icon_folder=$(dirname "$svg_dir")
+          icon_name=$(basename "$icon_folder")
+          mkdir -p "../../assets/${icon_name}/png"
+          for svg_file in "${svg_dir}"/*.svg; do
+            filename=$(basename "$svg_file" .svg)
+            for size in 16 32 64 128; do
+              rsvg-convert -w $size -h $size "$svg_file" | \
+              convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_name}/png/${filename}-${size}.png"
             done
-          fi
+          done
         done
 
     - name: Remove temporary files
@@ -88,7 +88,7 @@ jobs:
         git config user.name github-actions
         git config user.email github-actions@github.com
         git add assets
-        git commit -m "Update PNG icons" || echo "No changes to commit"
+        git commit -m "🎨 Refresh PNG icons" || echo "👌 All icons up-to-date, nothing to commit"
         git push
 
     - name: Update repository variable
