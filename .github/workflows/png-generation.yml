@@ -1,0 +1,83 @@
+name: Generate and Update PNG Icons
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  check-and-generate-pngs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout your repository
+      uses: actions/checkout@v2
+
+    - name: Get latest commit from microsoft/fluentui-system-icons
+      id: get_latest_commit
+      run: |
+        LATEST_COMMIT=$(curl -s "https://api.github.com/repos/microsoft/fluentui-system-icons/commits/main" | jq -r .sha)
+        echo "::set-output name=latest_commit::$LATEST_COMMIT"
+
+    - name: Check if update is needed
+      id: check_update
+      run: |
+        if [ ! -f "last_processed_commit.txt" ] || [ "${{ steps.get_latest_commit.outputs.latest_commit }}" != "$(cat last_processed_commit.txt)" ]; then
+          echo "::set-output name=update_needed::true"
+        else
+          echo "::set-output name=update_needed::false"
+        fi
+
+    - name: Checkout microsoft/fluentui-system-icons
+      if: steps.check_update.outputs.update_needed == 'true'
+      uses: actions/checkout@v2
+      with:
+        repository: microsoft/fluentui-system-icons
+        path: fluentui-temp
+
+    - name: Setup Node.js
+      if: steps.check_update.outputs.update_needed == 'true'
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+
+    - name: Install dependencies
+      if: steps.check_update.outputs.update_needed == 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y librsvg2-bin imagemagick
+
+    - name: Generate PNGs
+      if: steps.check_update.outputs.update_needed == 'true'
+      run: |
+        mkdir -p assets
+        cd fluentui-temp/assets
+        for icon_folder in */; do
+          if [ -d "${icon_folder}SVG" ]; then
+            mkdir -p "../../assets/${icon_folder}png"
+            for svg_file in "${icon_folder}SVG"/*.svg; do
+              filename=$(basename "$svg_file" .svg)
+              for size in 16 32 64 128; do
+                rsvg-convert -w $size -h $size "$svg_file" | \
+                convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_folder}png/${filename}-${size}.png"
+              done
+            done
+          fi
+        done
+
+    - name: Remove temporary files
+      if: steps.check_update.outputs.update_needed == 'true'
+      run: rm -rf fluentui-temp
+
+    - name: Update last processed commit
+      if: steps.check_update.outputs.update_needed == 'true'
+      run: echo "${{ steps.get_latest_commit.outputs.latest_commit }}" > last_processed_commit.txt
+
+    - name: Commit and push changes
+      if: steps.check_update.outputs.update_needed == 'true'
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add assets last_processed_commit.txt
+        git commit -m "Update PNG icons" || echo "No changes to commit"
+        git push
