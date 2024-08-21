@@ -95,9 +95,9 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.PAT }}
       run: |
-        curl -v -X PATCH \
-          -H "Authorization: token $GH_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          --http1.1 \
-          https://api.github.com/repos/${{ github.repository }}/actions/variables/LAST_PROCESSED_COMMIT \
-          -d "{\"name\":\"LAST_PROCESSED_COMMIT\",\"value\":\"${{ steps.get_latest_commit.outputs.latest_commit }}\"}"
+          gh api \
+          --method PATCH \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          /repos/${{ github.repository }}/actions/variables/LAST_PROCESSED_COMMIT \
+           -f "name=LAST_PROCESSED_COMMIT" -f "value=${{ steps.get_latest_commit.outputs.latest_commit }}" \
