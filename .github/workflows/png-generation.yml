@@ -59,17 +59,52 @@ jobs:
       run: |
         mkdir -p assets
         cd fluentui-temp/assets
-        find . -type d -name "SVG" | while read -r svg_dir; do
-          icon_folder=$(dirname "$svg_dir")
-          icon_name=$(basename "$icon_folder")
-          mkdir -p "../../assets/${icon_name}/png"
-          for svg_file in "${svg_dir}"/*.svg; do
-            filename=$(basename "$svg_file" .svg)
-            for size in 16 32 64 128; do
-              rsvg-convert -w $size -h $size "$svg_file" | \
-              convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_name}/png/${filename}-${size}.png"
+        for icon_folder in */; do
+          icon_name=${icon_folder%/}
+          
+          # Check if the icon folder has language subfolders
+          if [ -d "$icon_folder/en" ]; then
+            # Process language subfolders
+            for lang_folder in "$icon_folder"*/; do
+              lang=${lang_folder%/}
+              lang=${lang##*/}
+              
+              if [ -d "$lang_folder/SVG" ]; then
+                mkdir -p "../../assets/${icon_name}/${lang}"
+                
+                # Find the largest SVG size
+                largest_size=$(find "${lang_folder}/SVG" -name "*.svg" | sed -E 's/.*_([0-9]+)_.*/\1/' | sort -rn | head -1)
+                
+                for svg_file in "${lang_folder}/SVG"/*_${largest_size}_*.svg; do
+                  filename=$(basename "$svg_file" .svg)
+                  # Remove the size from the filename
+                  new_filename=$(echo "$filename" | sed -E 's/_[0-9]+_/_/')
+                  for size in 16 32 64 128; do
+                    rsvg-convert -w $size -h $size "$svg_file" | \
+                    convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_name}/${lang}/${new_filename}-${size}.png"
+                  done
+                done
+              fi
             done
-          done
+          else
+            # Process icons without language subfolders
+            if [ -d "$icon_folder/SVG" ]; then
+              mkdir -p "../../assets/${icon_name}/png"
+              
+              # Find the largest SVG size
+              largest_size=$(find "${icon_folder}/SVG" -name "*.svg" | sed -E 's/.*_([0-9]+)_.*/\1/' | sort -rn | head -1)
+              
+              for svg_file in "${icon_folder}/SVG"/*_${largest_size}_*.svg; do
+                filename=$(basename "$svg_file" .svg)
+                # Remove the size from the filename
+                new_filename=$(echo "$filename" | sed -E 's/_[0-9]+_/_/')
+                for size in 16 32 64 128; do
+                  rsvg-convert -w $size -h $size "$svg_file" | \
+                  convert - -background none -gravity center -extent ${size}x${size} "../../assets/${icon_name}/png/${new_filename}-${size}.png"
+                done
+              done
+            fi
+          fi
         done
 
     - name: Remove temporary files
